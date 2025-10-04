@@ -1,193 +1,134 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Life Dialogue Cards</title>
+  <meta charset="UTF-8">
+  <title>Would You Rather - Multiplayer</title>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js"></script>
   <style>
-    :root {
-      --primary-color: #4a90e2;
-      --accent-color: #f5f7fa;
-      --card-shadow: rgba(0, 0, 0, 0.1);
-    }
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: var(--accent-color);
-      margin: 0;
-      padding: 0;
-    }
-    .timeline {
-      display: flex;
-      overflow-x: auto;
-      background-color: #fff;
-      border-bottom: 1px solid #ddd;
-      position: sticky;
-      top: 0;
-      z-index: 10;
-    }
-    .timeline button {
-      flex: none;
-      min-width: 80px;
-      padding: 12px 8px;
-      font-size: 14px;
-      white-space: nowrap;
-      background-color: #fff;
-      border: none;
-      border-right: 1px solid #eee;
-      cursor: pointer;
-      color: #333;
-      transition: background 0.3s;
-    }
-    .timeline button.active {
-      background-color: var(--primary-color);
-      color: #fff;
-      font-weight: bold;
-    }
-    .container {
-      padding: 16px;
-      max-width: 100%;
-      margin: auto;
-    }
-    .card {
-      display: none;
-      background-color: white;
-      border-radius: 12px;
-      box-shadow: 0 4px 12px var(--card-shadow);
-      padding: 20px;
-      margin-top: 20px;
-    }
-    .card.active {
-      display: block;
-    }
-    .age-title {
-      font-size: 22px;
-      font-weight: 600;
-      color: var(--primary-color);
-      margin-bottom: 16px;
-    }
-    .question {
-      margin-bottom: 18px;
-      border-left: 4px solid var(--primary-color);
-      padding-left: 12px;
-    }
-    .eng {
-      font-size: 18px;
-      font-weight: 500;
-      margin-bottom: 6px;
-      color: #222;
-    }
-    .chi {
-      font-size: 13px;
-      color: #888;
-    }
-    @media (max-width: 480px) {
-      .timeline button {
-        font-size: 13px;
-        padding: 10px 6px;
-      }
-      .eng {
-        font-size: 16px;
-      }
-      .chi {
-        font-size: 12px;
-      }
-    }
+    body { font-family: Arial, sans-serif; max-width: 700px; margin: 20px auto; }
+    .question { margin: 20px 0; }
+    button { margin: 10px 5px; padding: 8px 15px; }
+    #result { background: #f5f5f5; padding: 15px; border-radius: 8px; margin-top: 20px; }
   </style>
 </head>
 <body>
-  <div class="timeline" id="timeline"></div>
-  <div class="container" id="cards"></div>
+  <h2>Would You Rather - Multiplayer</h2>
 
-  <script>
-    const ageGroups = [
-      "0–10", "10–20", "20–30", "30–40", "40–50",
-      "50–60", "60–70", "70–80", "80–90", "90–100"
+  <div id="form">
+    <label>你的暱稱：</label><br>
+    <input id="nickname" placeholder="輸入暱稱"><br><br>
+
+    <div id="questions"></div>
+    <button onclick="submitAnswers()">提交答案</button>
+  </div>
+
+  <div id="result" style="display:none;"></div>
+
+  <script type="module">
+    // --- Firebase Config (請換成你的專案資訊) ---
+    // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+	const firebaseConfig = {
+		apiKey: "AIzaSyAPRJsQCBPbbrbcOFTJDkl3LMwkKf9Lc8E",
+		authDomain: "match-wouldyourather.firebaseapp.com",
+		databaseURL: "https://match-wouldyourather-default-rtdb.asia-southeast1.firebasedatabase.app",
+		projectId: "match-wouldyourather",
+		storageBucket: "match-wouldyourather.firebasestorage.app",
+		messagingSenderId: "275894995617",
+		appId: "1:275894995617:web:7e1845c39badb32a41fee0",
+		measurementId: "G-1H6F34WYGJ"
+	};
+
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    // --- 題目 ---
+    const questions = [
+      "Would you rather have the ability to fly 🪽 or be invisible 👻?",
+      "Would you rather live in the city 🌆 or the countryside 🌳?",
+      "Would you rather always be 10 minutes late ⏰ or always 20 minutes early ⌛?",
+      "Would you rather give up social media 📱 or give up TV 📺?",
+      "Would you rather be rich 💰 and unknown 🤐 or poor 💸 and famous 🌟?",
+      "Would you rather never use the internet again 🌐 or never take an airplane ✈️?",
+      "Would you rather read minds 🧠 or predict the future 🔮?",
+      "Would you rather be always hot 🔥 or always cold ❄️?",
+      "Would you rather explore space 🚀 or the deep sea 🌊?",
+      "Would you rather always have free food 🍔 or always have free travel ✈️?"
     ];
 
-    const questions = document.getElementById("data").textContent;
-    const timeline = document.getElementById("timeline");
-    const cards = document.getElementById("cards");
+    let myNickname = null;
+    let myAnswers = null;
 
-    const data = JSON.parse(questions);
-
-    ageGroups.forEach((age, index) => {
-      const btn = document.createElement("button");
-      btn.textContent = age;
-      if (index === 0) btn.classList.add("active");
-      btn.onclick = () => showCard(index);
-      timeline.appendChild(btn);
-
-      const card = document.createElement("div");
-      card.className = "card" + (index === 0 ? " active" : "");
-      card.innerHTML = `<div class="age-title">Age ${age}</div>` +
-        data[index].map(q => `
-          <div class="question">
-            <div class="eng">${q[0]}</div>
-            <div class="chi">${q[1]}</div>
-          </div>
-        `).join("");
-      cards.appendChild(card);
+    // 顯示題目
+    const qDiv = document.getElementById("questions");
+    questions.forEach((q, i) => {
+      const div = document.createElement("div");
+      div.className = "question";
+      div.innerHTML = `
+        <p>${i+1}. ${q}</p>
+        <label><input type="radio" name="q${i}" value="A"> Option A</label>
+        <label><input type="radio" name="q${i}" value="B"> Option B</label>
+      `;
+      qDiv.appendChild(div);
     });
 
-    function showCard(index) {
-      document.querySelectorAll(".timeline button").forEach(btn => btn.classList.remove("active"));
-      document.querySelectorAll(".timeline button")[index].classList.add("active");
-      document.querySelectorAll(".card").forEach(c => c.classList.remove("active"));
-      document.querySelectorAll(".card")[index].classList.add("active");
+    async function submitAnswers() {
+      myNickname = document.getElementById("nickname").value.trim();
+      if (!myNickname) { alert("請輸入暱稱"); return; }
+
+      const selected = [];
+      for (let i=0; i<questions.length; i++) {
+        const choice = document.querySelector(`input[name="q${i}"]:checked`);
+        if (!choice) { alert(`請回答第 ${i+1} 題`); return; }
+        selected.push(choice.value);
+      }
+      myAnswers = selected;
+
+      // 寫入 DB（每個暱稱唯一）
+      await set(ref(db, "participants/" + myNickname), { nickname: myNickname, answers: selected });
+      document.getElementById("form").style.display = "none";
+      document.getElementById("result").style.display = "block";
+      document.getElementById("result").innerHTML = "<p>等待其他人完成作答中...</p>";
     }
-  </script>
-  <script id="data" type="application/json">
-    [[
-      ["🌀 If your toys could talk, what secret would they reveal?", "你的玩具會爆你什麼料？"],
-      ["💭 What kind of grown-up do you want to be? Why?", "你長大後想變成怎樣的大人？為什麼？"],
-      ["☕ What does your perfect day look like? Who’s in it?", "你最喜歡的一天會長什麼樣子？有誰？"]
-    ],
-    [
-      ["🎢 What was your most embarrassing school moment?", "你學生時期最糗的一件事是什麼？"],
-      ["🧠 What’s something you’ve learned outside of school that changed you?", "在學校以外，你學過最改變你的一件事？"],
-      ["🍜 What was your go-to after school snack or hangout spot?", "你最常放學後去哪裡玩或吃什麼？"]
-    ],
-    [
-      ["🚀 What dream did you chase in your 20s?", "你在二十幾歲時追過什麼夢？"],
-      ["💔 What was one hard lesson in love or career?", "關於愛情或職涯，你學過最痛的一課？"],
-      ["🍻 What did your weekends usually look like?", "你週末都在幹嘛？"]
-    ],
-    [
-      ["♻️ What changed completely in your 30s?", "你三十幾歲時，有什麼翻天覆地的改變？"],
-      ["🧩 How did you balance dreams and responsibilities?", "你如何平衡夢想與責任？"],
-      ["🎯 What goals did you let go of? Why?", "你放棄了哪些目標？為什麼？"]
-    ],
-    [
-      ["🗺️ What new territory did you explore in life or mind?", "你在生活或心靈上探索了哪些新世界？"],
-      ["🏆 What have you achieved that your younger self would be proud of?", "你達成了什麼，會讓年輕時的你感到驕傲？"],
-      ["💬 What kinds of conversations did you value the most?", "你最重視什麼樣的對話？"]
-    ],
-    [
-      ["🔄 How has your perspective on success changed?", "你對成功的看法有什麼改變？"],
-      ["🌄 What do your mornings look like now?", "你現在的早晨是什麼模樣？"],
-      ["🎙️ What advice do people ask you for most?", "別人最常問你什麼建議？"]
-    ],
-    [
-      ["📖 What stories do you find yourself repeating?", "你常常重複說的故事是什麼？"],
-      ["🧓 What’s something only age could teach you?", "有哪些事是年紀才能教會你的？"],
-      ["🌱 What hobbies keep you feeling young?", "哪些嗜好讓你覺得自己還年輕？"]
-    ],
-    [
-      ["🔍 What reflections define this stage of life?", "你覺得現在這個年紀的關鍵反思是什麼？"],
-      ["📷 What memory would you frame forever?", "你最想永遠記住的一個畫面是什麼？"],
-      ["🍲 What dish brings back the most vivid memories?", "哪一道菜最容易喚起你的回憶？"]
-    ],
-    [
-      ["🎁 What gift would you give your younger self?", "你最想送年輕的自己一個什麼禮物？"],
-      ["💌 What message would you leave for future generations?", "你會想留給未來世代什麼話？"],
-      ["🧩 Which puzzle in life still remains unsolved?", "人生中還有什麼未解之謎？"]
-    ],
-    [
-      ["🌌 What legacy do you hope to leave behind?", "你希望留下什麼樣的遺產／印記？"],
-      ["🕊️ How do you imagine your final goodbye?", "你想像中的告別是什麼模樣？"],
-      ["💫 What do you hope others remember you for?", "你希望別人記得你的哪一部分？"]
-    ]
-    ]
+
+    // --- 監聽資料庫即時更新 ---
+    onValue(ref(db, "participants"), (snapshot) => {
+      if (!myNickname || !myAnswers) return; // 尚未回答
+      if (!snapshot.exists()) return;
+
+      const allData = snapshot.val();
+      const entries = Object.values(allData);
+      const me = entries.find(p => p.nickname === myNickname);
+      if (!me) return;
+
+      let mostSimilar = null, leastSimilar = null;
+      let maxScore = -1, minScore = 999;
+
+      entries.forEach(p => {
+        if (p.nickname !== me.nickname) {
+          let same = 0;
+          for (let i=0; i<questions.length; i++) {
+            if (p.answers[i] === me.answers[i]) same++;
+          }
+          let score = same / questions.length;
+          if (score > maxScore) { maxScore = score; mostSimilar = p.nickname; }
+          if (score < minScore) { minScore = score; leastSimilar = p.nickname; }
+        }
+      });
+
+      let msg = `<h3>結果 for ${me.nickname}</h3>`;
+      if (entries.length === 1) {
+        msg += `<p>目前只有你一個人作答，等其他人加入再來看看配對吧！</p>`;
+      } else {
+        msg += `<p>🎯 你和 <b>${mostSimilar}</b> 最相似 (${Math.round(maxScore*100)}%)</p>`;
+        msg += `<p>⚡ 你和 <b>${leastSimilar}</b> 最不相似 (${Math.round(minScore*100)}%)</p>`;
+      }
+
+      document.getElementById("result").innerHTML = msg;
+    });
   </script>
 </body>
 </html>
